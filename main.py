@@ -2,6 +2,7 @@ from flask import Flask, make_response, jsonify, request, abort
 from pip._vendor import requests
 from flask_cors import CORS
 import pyodbc
+import numpy as np
 
 
 app = Flask(__name__)
@@ -33,10 +34,10 @@ clientes = list()
 def get_clientes():
     cursor = cnxn.cursor()
     lista = cursor.execute(
-        "exec uspGerarNumerosDiscador @Operacao='GND', @DataLigar='2017/12/05', @RegistrosGerar=2;"
+        "exec uspGerarNumerosDiscador @Operacao='GND', @DataLigar='2022/07/14', @RegistrosGerar=2;"
     )
     contatos = lista.fetchall()
-
+    clientes.clear()
     for cliente in contatos:
         clientes.append(
             {
@@ -53,37 +54,55 @@ def get_clientes():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.method == 'POST':
-        return make_response(
-            jsonify(request.json)
-        )
+        dataret= request.get_json()
+        info= dataret['Body']['Text']
+        
     else:
         abort(404)
 
 def post_clientes(clientes):
-    
+   
     for i in clientes:
-        tel = i["DDTelefone"] + i["Telefone"]
-        nomecliente = i["nomecliente"]
-        IdTelemarketing = i["IdTelemarketing"]
+        ddd = i["DDTelefone"] 
+        telcli =  i["Telefone"]
+        if (ddd is None or telcli is None):
+            print("DDD ou tel em Branco")
+           
+        else :
+            tel = ddd + telcli
+            nomecliente = i["nomecliente"]
+            IdTelemarketing = i["IdTelemarketing"]
 
-        message = f"Olá Boa tarde! {nomecliente} , tudo bem? Aqui é a Jade da  Empresa Acquasoft purificadores de água, consta em nosso sistema que já se encontra no prazo de realizar a troca do refil, o Sr deseja agendar? Temos disponibilidade a partir de amanhã.Seu Id {IdTelemarketing}"
-        url = "https://v5.chatpro.com.br/chatpro-6790d7a23d/api/v1/send_button_message"
-        payload = {
-            "buttons": [{"id": "1", "text": "Sim"}, {"id": "2", "text": "Não"}],
-            "number": tel,  # "21985550409",
-            "message": message,
-            "title": "Agendar?",
-        }
-        headers = {
-            "accept": "application/json",
-            "content-type": "application/json",
-            "Authorization": "f9484f1e859abd063c6195fcd0eae254",
-        }
-        
-        response = requests.post(url, json=payload, headers=headers)
-       
-        print(response.text)
-
+            message = f"Olá Boa tarde! {nomecliente} , tudo bem? Aqui é a Jade da  Empresa Acquasoft purificadores de água, consta em nosso sistema que já se encontra no prazo de realizar a troca do refil, o Sr(a) deseja agendar? Temos disponibilidade a partir de amanhã.Seu Id {IdTelemarketing} """
+            url = "https://v5.chatpro.com.br/chatpro-1034a36039/api/v1/send_message"
+            payload = {
+            
+                "number":"21 99993-1578" ,# "21967445985",#"21985550409", #tel
+                "message": message
+            
+            }
+            headers = {
+                "accept": "application/json",
+                "content-type": "application/json",
+                "Authorization": "bb805f8a708f387ca4c139d384c9b7c4",
+            }
+            try:
+                response = requests.post(url, json=payload, headers=headers)
+                data = response.json()
+                if response.status_code == 201:
+                    for result in data["resposeMessage"]:
+                        id = result["id"] 
+                        cursor2 = cnxn.cursor()
+                        qinsert = f"insert StatusMsgAPI values({IdTelemarketing},{tel},'{nomecliente}','{id}','MensagemEnviada') ;"
+                        #cursor2.execute(qinsert)
+                        
+                        print(response.text)
+                else:
+                    print("Nao enviada")
+            except requests.exceptions.RequestException as e:  
+                with open("log.txt", "w") as arquivo:
+	                arquivo.write(f"Status {response.status_code} retornou com  '{response.content}',  falha no envio da msg." )
+                    #print(f"Status {response.status_code} retornou com  '{response.content}',  falha no envio da msg.")
 
 if __name__ == "__main__":
     app.run()
