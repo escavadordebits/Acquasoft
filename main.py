@@ -60,9 +60,8 @@ def webhook():
         abort(404)
 
 def post_clientes(clientes):
-
+    
     for i in clientes:
-
         tel = i["DDTelefone"] + i["Telefone"]
         nomecliente = i["nomecliente"]
         IdTelemarketing = i["IdTelemarketing"]
@@ -80,7 +79,9 @@ def post_clientes(clientes):
             "content-type": "application/json",
             "Authorization": "f9484f1e859abd063c6195fcd0eae254",
         }
+        
         response = requests.post(url, json=payload, headers=headers)
+       
         print(response.text)
 
 
